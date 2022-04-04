@@ -1,23 +1,29 @@
-$user = ""
-$token = "2ot4dxneeuycg25lr3imaqxo6xcvte34mqdt5dcqiqrqukxak"
+$user = "haythem.azizi@levio.ca"
+$token = ""
 
 $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $user,$token)))
 $orgUrl = "https://dev.azure.com/haythemazizi0459"
 $teamProject = "Test"
 $wikiRepoName = "Test.wiki"
 $wikiContentTemplate = "{`"content`": `"{content}`"}"
-
-$restApiUpdateWikiPut = "$orgUrl/$teamProject/_apis/wiki/wikis/$wikiRepoName/pages/{path}?api-version=7.1-preview.1"
+$global:wikiOldPageContent=""
+$restApiUpdateWikiPut = "$orgUrl/$teamProject/_apis/wiki/wikis/$wikiRepoName/pages/{path}?api-version=6.1"
 
 function InvokeGetRequest ($GetUrl)
 {    
     return Invoke-RestMethod -Uri $GetUrl -Method Get -ContentType "application/json" -Headers @{Authorization=("Basic {0}" -f $base64AuthInfo)}    
 }
 
-function InvokeGetETag ($GetUrl)
+function InvokeGetETag ($GetUrl ,[REF]$wikiContent)
 {   
     $Headers = $null
-    Invoke-RestMethod -Uri $GetUrl -Method Get -ContentType "application/json" -Headers @{Authorization=("Basic {0}" -f $base64AuthInfo)} -ResponseHeadersVariable 'Headers'
+    $wikiOldPageOldContent = Invoke-RestMethod -Uri "$GetUrl&includeContent=True" -Method Get -ContentType "application/json" -Headers @{Authorization=("Basic {0}" -f $base64AuthInfo)} -ResponseHeadersVariable 'Headers'
+    $wikiContent.Value = $wikiOldPageOldContent.Content
+    
+    Write-Host $wikiOldPageOldContent.Content
+    
+    Write-Host "---"
+    Write-Host $wikiOldPageContent
     return $Headers["ETag"]
 }
 
@@ -42,14 +48,18 @@ function UpdateWiki([string] $wkPagePath, [string] $wikiContent)
     else 
     {
         #Get Etag that is used in a post request
-        $eTagRaw = InvokeGetETag $updateUrl 
+        $eTagRaw = InvokeGetETag $updateUrl ([REF]$global:wikiOldPageContent)
     
         $ETag = $eTagRaw -join ""
     }
     
     try {
         #Update a wiki content
-        $wikiContentUpdate = $wikiContentTemplate.Replace("{content}", $wikiContent)
+        
+        Write-Host $wikiOldPageContent
+        $wikiOldPageContent = $wikiOldPageContent.Replace("85", "`n")
+        $newConent= "$wikiContent `n $wikiOldPageContent"
+        $wikiContentUpdate = $wikiContentTemplate.Replace("{content}", $newConent)
 
         InvokePutRequest $updateUrl $wikiContentUpdate $eTag
 
@@ -61,4 +71,4 @@ function UpdateWiki([string] $wkPagePath, [string] $wikiContent)
 }
 
 
-UpdateWiki "2" "mycontent" 
+UpdateWiki "2" "####haythem azizi" 
